@@ -156,7 +156,7 @@ class ZaloOa {
                     default: 'refresh',
                 },
                 {
-                    displayName: 'Số Điện Thoại Người Nhận',
+                    displayName: 'Số ĐIện Thoại Người Nhận',
                     name: 'phone',
                     type: 'string',
                     required: true,
@@ -180,7 +180,7 @@ class ZaloOa {
                     type: 'json',
                     required: true,
                     default: '{}',
-                    description: 'Object JSON chứa các biến tương ứng với template. Ví dụ: {"customer":"Nguyễn Văn A","amount":"100.000"}',
+                    description: 'Object JSON chứa các biến tương ứng với template. Ví dụ: {"customer":"Nguyễn Văn A","amount":"100.000"}.',
                     typeOptions: { rows: 5 },
                     displayOptions: { show: { resource: ['message'] } },
                 },

@@ -2,6 +2,7 @@ import type { ICredentialDataDecryptedObject, ICredentialTestRequest, ICredentia
 export declare class ZaloOaApi implements ICredentialType {
     name: string;
     displayName: string;
+    icon: "file:zaloOa.svg";
     documentationUrl: string;
     properties: INodeProperties[];
     authenticate: (credentials: ICredentialDataDecryptedObject, requestOptions: IHttpRequestOptions) => Promise<IHttpRequestOptions>;

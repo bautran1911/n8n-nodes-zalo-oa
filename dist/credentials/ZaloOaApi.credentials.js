@@ -5,6 +5,7 @@ class ZaloOaApi {
     constructor() {
         this.name = 'zaloOaApi';
         this.displayName = 'Zalo OA API';
+        this.icon = 'file:zaloOa.svg';
         this.documentationUrl = 'https://developers.zalo.me/docs/official-account/authentication/';
         this.properties = [
             {
