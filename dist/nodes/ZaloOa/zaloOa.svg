@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 60" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#0068FF"/>
+      <stop offset="100%" stop-color="#0053CC"/>
+    </linearGradient>
+    <linearGradient id="shimmer" x1="0" y1="0" x2="60" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="60" height="60" rx="13" fill="url(#bgGrad)"/>
+  <!-- Shimmer overlay -->
+  <rect width="60" height="30" rx="13" fill="url(#shimmer)"/>
+  <!-- Z letter -->
+  <text x="7" y="43" font-family="Arial Black, Arial, sans-serif" font-size="30" font-weight="900" fill="white" letter-spacing="-1">Z</text>
+  <!-- OA badge -->
+  <rect x="33" y="8" width="20" height="10" rx="3" fill="white" opacity="0.95"/>
+  <text x="43" y="16" font-family="Arial, sans-serif" font-size="7" font-weight="700" fill="#0068FF" text-anchor="middle">OA</text>
+  <!-- Decorative lines -->
+  <rect x="33" y="22" width="18" height="3" rx="1.5" fill="white" opacity="0.6"/>
+  <rect x="33" y="29" width="14" height="3" rx="1.5" fill="white" opacity="0.45"/>
+  <rect x="33" y="36" width="16" height="3" rx="1.5" fill="white" opacity="0.3"/>
+  <!-- Bottom accent -->
+  <rect x="7" y="50" width="46" height="2" rx="1" fill="white" opacity="0.2"/>
+</svg>

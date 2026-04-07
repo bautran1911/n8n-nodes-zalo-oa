@@ -1,0 +1,422 @@
+import type {
+	IDataObject,
+	IExecuteFunctions,
+	IHttpRequestOptions,
+	INodeExecutionData,
+	INodeType,
+	INodeTypeDescription,
+} from 'n8n-workflow';
+import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
+
+const ZALO_ZBS_API_BASE = 'https://business.openapi.zalo.me';
+const ZALO_TOKEN_URL = 'https://oauth.zaloapp.com/v4/oa/access_token';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Interfaces
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface ZaloCredentials {
+	credentialName: string;
+	appId: string;
+	secretKey: string;
+	accessToken: string;
+	refreshToken: string;
+	n8nInstanceUrl?: string;
+	n8nApiKey?: string;
+	credentialId?: string;
+	allowedHttpRequestDomains?: 'all' | 'domains' | 'none';
+	allowedDomains?: string;
+}
+
+interface ZaloTokenResponse {
+	access_token: string;
+	refresh_token: string;
+	error?: number | string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Gọi Zalo token endpoint để lấy access token mới từ refresh token.
+ */
+async function refreshAccessToken(
+	ctx: IExecuteFunctions,
+	creds: ZaloCredentials,
+): Promise<ZaloTokenResponse> {
+	const body = new URLSearchParams();
+	body.append('app_id', creds.appId);
+	body.append('refresh_token', creds.refreshToken);
+	body.append('grant_type', 'refresh_token');
+
+	const options: IHttpRequestOptions = {
+		method: 'POST',
+		url: ZALO_TOKEN_URL,
+		headers: {
+			'Content-Type': 'application/x-www-form-urlencoded',
+			secret_key: creds.secretKey,
+		},
+		body,
+		json: true,
+	};
+
+	const response = (await ctx.helpers.httpRequest(options)) as ZaloTokenResponse;
+
+	if (!response.access_token) {
+		throw new NodeOperationError(
+			ctx.getNode(),
+			`Zalo refresh token thất bại: ${JSON.stringify(response)}`,
+		);
+	}
+
+	return response;
+}
+
+/**
+ * Ghi access_token & refresh_token mới về credential trong n8n
+ * thông qua n8n REST API: PATCH /api/v1/credentials/:id
+ */
+async function writeTokensToCredential(
+	ctx: IExecuteFunctions,
+	creds: ZaloCredentials,
+	newAccessToken: string,
+	newRefreshToken: string,
+): Promise<void> {
+	const { n8nInstanceUrl, n8nApiKey, credentialId } = creds;
+
+	if (!n8nInstanceUrl || !n8nApiKey || !credentialId) {
+		return;
+	}
+
+	const baseUrl = n8nInstanceUrl.replace(/\/$/, '');
+
+	try {
+		const dataPayload: Record<string, string> = {
+			credentialName: creds.credentialName,
+			appId: creds.appId,
+			secretKey: creds.secretKey,
+			accessToken: newAccessToken,
+			refreshToken: newRefreshToken,
+			n8nInstanceUrl: n8nInstanceUrl ?? '',
+			n8nApiKey: n8nApiKey ?? '',
+			credentialId: credentialId ?? '',
+			allowedHttpRequestDomains: creds.allowedHttpRequestDomains ?? 'all',
+		};
+
+		if (creds.allowedHttpRequestDomains === 'domains' && creds.allowedDomains) {
+			dataPayload.allowedDomains = creds.allowedDomains;
+		}
+
+		const options: IHttpRequestOptions = {
+			method: 'PATCH',
+			url: `${baseUrl}/api/v1/credentials/${credentialId}`,
+			headers: {
+				'X-N8N-API-KEY': n8nApiKey,
+				'Content-Type': 'application/json',
+			},
+			body: {
+				name: creds.credentialName,
+				type: 'zaloOaApi',
+				data: dataPayload,
+			},
+			json: true,
+		};
+
+		await ctx.helpers.httpRequest(options);
+	} catch (err) {
+		ctx.logger.warn(
+			`[ZaloOa] Không thể cập nhật credential: ${(err as Error).message}`,
+		);
+	}
+}
+
+/**
+ * Gọi Zalo ZBS API. Nếu token hết hạn (error -124 / 3), tự động refresh
+ * và ghi token mới về credential, rồi retry.
+ */
+async function callZaloZbsApi(
+	ctx: IExecuteFunctions,
+	endpoint: string,
+	body: IDataObject,
+	creds: ZaloCredentials,
+	retried = false,
+): Promise<IDataObject> {
+	const options: IHttpRequestOptions = {
+		method: 'POST',
+		url: `${ZALO_ZBS_API_BASE}${endpoint}`,
+		headers: {
+			access_token: creds.accessToken,
+			'Content-Type': 'application/json',
+		},
+		body,
+		json: true,
+	};
+
+	let response: IDataObject;
+
+	try {
+		response = (await ctx.helpers.httpRequest(options)) as IDataObject;
+	} catch (err) {
+		throw new NodeOperationError(ctx.getNode(), err as Error);
+	}
+
+	// Zalo trả error -124 hoặc 3 = token hết hạn
+	const errorCode = response.error;
+	const isTokenExpired =
+		!retried &&
+		(errorCode === -124 ||
+			errorCode === 3 ||
+			errorCode === '-124' ||
+			errorCode === '3');
+
+	if (isTokenExpired) {
+		const newTokens = await refreshAccessToken(ctx, creds);
+		const newAccessToken = newTokens.access_token;
+		const newRefreshToken = newTokens.refresh_token;
+
+		creds.accessToken = newAccessToken;
+		creds.refreshToken = newRefreshToken;
+
+		await writeTokensToCredential(ctx, creds, newAccessToken, newRefreshToken);
+
+		return await callZaloZbsApi(ctx, endpoint, body, creds, true);
+	}
+
+	return response;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Node definition
+// ─────────────────────────────────────────────────────────────────────────────
+
+export class ZaloOa implements INodeType {
+	description: INodeTypeDescription = {
+		displayName: 'Zalo OA',
+		name: 'zaloOa',
+		icon: 'file:zaloOa.svg',
+		group: ['transform'],
+		version: 1,
+		subtitle: '={{$parameter["resource"] === "token" ? "Refresh Token" : "Gửi ZBS Template"}}',
+		description: 'Gửi tin ZBS Template Message qua SĐT và quản lý token (Zalo Business Solution)',
+		defaults: {
+			name: 'Zalo OA',
+		},
+		usableAsTool: true,
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
+		credentials: [{ name: 'zaloOaApi', required: true }],
+		properties: [
+
+			// ── RESOURCE ─────────────────────────────────────────────────────────────
+			{
+				displayName: 'Resource',
+				name: 'resource',
+				type: 'options',
+				noDataExpression: true,
+				options: [
+					{
+						name: 'Tin Nhắn ZBS Template',
+						value: 'message',
+						description: 'Gửi tin nhắn ZBS Template qua số điện thoại',
+					},
+					{
+						name: 'Token',
+						value: 'token',
+						description: 'Làm mới Access Token và ghi đè vào credential định kỳ',
+					},
+				],
+				default: 'message',
+			},
+
+			// ══════════════════════════════════════════════════════════════════════════
+			// TOKEN – Refresh
+			// ══════════════════════════════════════════════════════════════════════════
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: { show: { resource: ['token'] } },
+				options: [
+					{
+						name: 'Refresh Token',
+						value: 'refresh',
+						description: 'Làm mới Access Token bằng Refresh Token và tự động ghi đè vào credential',
+						action: 'Refresh and save access token',
+					},
+				],
+				default: 'refresh',
+			},
+
+			// ══════════════════════════════════════════════════════════════════════════
+			// MESSAGE – Gửi ZBS Template
+			// ══════════════════════════════════════════════════════════════════════════
+
+			// ── Số điện thoại người nhận ─────────────────────────────────────────────
+			{
+				displayName: 'Số Điện Thoại Người Nhận',
+				name: 'phone',
+				type: 'string',
+				required: true,
+				default: '',
+				placeholder: '84987654321',
+				description: 'Số điện thoại người nhận định dạng quốc tế (ví dụ: 84987654321 hoặc +84987654321)',
+				displayOptions: { show: { resource: ['message'] } },
+			},
+
+			// ── Template ID ──────────────────────────────────────────────────────────
+			{
+				displayName: 'Template ID',
+				name: 'templateId',
+				type: 'string',
+				required: true,
+				default: '',
+				description: 'ID của mẫu tin nhắn (template) đã được đăng ký và phê duyệt trên Zalo',
+				displayOptions: { show: { resource: ['message'] } },
+			},
+
+			// ── Template Data ────────────────────────────────────────────────────────
+			{
+				displayName: 'Dữ Liệu Template (JSON)',
+				name: 'templateData',
+				type: 'json',
+				required: true,
+				default: '{}',
+				description: 'Object JSON chứa các biến tương ứng với template. Ví dụ: {"customer":"Nguyễn Văn A","amount":"100.000"}',
+				typeOptions: { rows: 5 },
+				displayOptions: { show: { resource: ['message'] } },
+			},
+
+			// ── Tracking ID ──────────────────────────────────────────────────────────
+			{
+				displayName: 'Tracking ID (Tuỳ Chọn)',
+				name: 'trackingId',
+				type: 'string',
+				default: '',
+				description: 'Mã theo dõi tuỳ chỉnh cho yêu cầu này (tối đa 48 ký tự)',
+				displayOptions: { show: { resource: ['message'] } },
+			},
+
+			// ── Sending Mode ─────────────────────────────────────────────────────────
+			{
+				displayName: 'Chế Độ Gửi',
+				name: 'sendingMode',
+				type: 'options',
+				default: '1',
+				description: 'Chế độ gửi tin nhắn',
+				options: [
+					{
+						name: 'Gửi Thường (Trong Hạn Mức)',
+						value: '1',
+						description: 'Gửi tin trong hạn mức cho phép (mặc định)',
+					},
+					{
+						name: 'Gửi Vượt Hạn Mức',
+						value: '3',
+						description: 'Gửi vượt hạn mức (cần được whitelist bởi Zalo)',
+					},
+				],
+				displayOptions: { show: { resource: ['message'] } },
+			},
+		],
+	};
+
+	// ── Execute ────────────────────────────────────────────────────────────────
+	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+		const items = this.getInputData();
+		const returnData: INodeExecutionData[] = [];
+
+		const rawCreds = await this.getCredentials('zaloOaApi');
+		const creds: ZaloCredentials = {
+			credentialName: rawCreds.credentialName as string,
+			appId: rawCreds.appId as string,
+			secretKey: rawCreds.secretKey as string,
+			accessToken: rawCreds.accessToken as string,
+			refreshToken: rawCreds.refreshToken as string,
+			n8nInstanceUrl: (rawCreds.n8nInstanceUrl as string) || '',
+			n8nApiKey: (rawCreds.n8nApiKey as string) || '',
+			credentialId: (rawCreds.credentialId as string) || '',
+			allowedHttpRequestDomains: ((rawCreds.allowedHttpRequestDomains as string) || 'all') as 'all' | 'domains' | 'none',
+			allowedDomains: (rawCreds.allowedDomains as string) || '',
+		};
+
+		for (let i = 0; i < items.length; i++) {
+			const resource = this.getNodeParameter('resource', i) as string;
+
+			let result: IDataObject = {};
+
+			// ── TOKEN: Refresh ─────────────────────────────────────────────────────
+			if (resource === 'token') {
+				const newTokens = await refreshAccessToken(this, creds);
+				const newAccessToken = newTokens.access_token;
+				const newRefreshToken = newTokens.refresh_token;
+
+				// Cập nhật trong bộ nhớ
+				creds.accessToken = newAccessToken;
+				creds.refreshToken = newRefreshToken;
+
+				// Ghi đè vào credential n8n
+				await writeTokensToCredential(this, creds, newAccessToken, newRefreshToken);
+
+				result = {
+					success: true,
+					access_token: newAccessToken,
+					refresh_token: newRefreshToken,
+					credentialUpdated: !!(creds.n8nInstanceUrl && creds.n8nApiKey && creds.credentialId),
+					message: creds.credentialId
+						? 'Token đã được làm mới và ghi đè vào credential thành công.'
+						: 'Token đã được làm mới. (Chưa có Credential ID → chưa ghi đè tự động)',
+				};
+			}
+
+			// ── MESSAGE: Gửi ZBS Template ──────────────────────────────────────────
+			else if (resource === 'message') {
+				const phone = this.getNodeParameter('phone', i) as string;
+				const templateId = this.getNodeParameter('templateId', i) as string;
+				const templateDataRaw = this.getNodeParameter('templateData', i) as string | IDataObject;
+				const trackingId = this.getNodeParameter('trackingId', i) as string;
+				const sendingMode = this.getNodeParameter('sendingMode', i) as string;
+
+				// Parse template_data nếu là chuỗi JSON
+				let templateData: IDataObject;
+				if (typeof templateDataRaw === 'string') {
+					try {
+						templateData = JSON.parse(templateDataRaw) as IDataObject;
+					} catch {
+						throw new NodeOperationError(
+							this.getNode(),
+							`Dữ liệu template không hợp lệ (không phải JSON hợp lệ): ${templateDataRaw}`,
+							{ itemIndex: i },
+						);
+					}
+				} else {
+					templateData = templateDataRaw;
+				}
+
+				// Build request body
+				const requestBody: IDataObject = {
+					phone,
+					template_id: templateId,
+					template_data: templateData,
+					sending_mode: Number(sendingMode),
+				};
+
+				if (trackingId) {
+					requestBody.tracking_id = trackingId;
+				}
+
+				result = await callZaloZbsApi(
+					this,
+					'/message/template',
+					requestBody,
+					creds,
+				);
+			}
+
+			returnData.push({ json: result, pairedItem: { item: i } });
+		}
+
+		return [returnData];
+	}
+}
