@@ -19,6 +19,7 @@
 - [Compatibility](#compatibility)
 - [Tài nguyên](#tài-nguyên)
 - [Tác giả](#tác-giả)
+- [☕ Ủng hộ tác giả](#-ủng-hộ-tác-giả)
 
 ---
 
@@ -190,6 +191,23 @@ Tạo workflow với:
 **Báu Đẹp Trai**  
 📧 [bautran1911@gmail.com](mailto:bautran1911@gmail.com)  
 🐙 [github.com/bautran1911](https://github.com/bautran1911)
+
+---
+
+## ☕ Ủng hộ tác giả
+
+Nếu node này giúp ích cho công việc của bạn, hãy ủng hộ tác giả một ly cà phê để tiếp tục phát triển và duy trì dự án! 🙏
+
+### 🏦 Chuyển khoản ngân hàng (Việt Nam)
+
+| Thông tin | Chi tiết |
+|-----------|----------|
+| **Ngân hàng** | MB Bank (Ngân Hàng Quân Đội) |
+| **Số tài khoản** | `0930113997979` |
+| **Chủ tài khoản** | TRAN NGOC BAU |
+| **Nội dung CK** | `donate n8n zalo oa` |
+
+> 💡 Bạn cũng có thể dùng **MoMo**, **ZaloPay**, hoặc **VietQR** để chuyển khoản nhanh qua số tài khoản trên.
 
 ---
 
