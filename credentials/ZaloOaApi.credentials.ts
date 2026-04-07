@@ -11,6 +11,8 @@ export class ZaloOaApi implements ICredentialType {
 
 	displayName = 'Zalo OA API';
 
+	icon = 'file:zaloOa.svg' as const;
+
 	documentationUrl = 'https://developers.zalo.me/docs/official-account/authentication/';
 
 	properties: INodeProperties[] = [

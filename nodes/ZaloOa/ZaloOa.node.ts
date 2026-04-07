@@ -261,7 +261,7 @@ export class ZaloOa implements INodeType {
 				required: true,
 				default: '',
 				placeholder: '84987654321',
-				description: 'Số điện thoại người nhận định dạng quốc tế (ví dụ: 84987654321 hoặc +84987654321)',
+				description: 'Số điện thoại người nhận định dạng quốc tế (ví dụ: 84987654321 hoặc +84987654321).',
 				displayOptions: { show: { resource: ['message'] } },
 			},
 
@@ -283,7 +283,7 @@ export class ZaloOa implements INodeType {
 				type: 'json',
 				required: true,
 				default: '{}',
-				description: 'Object JSON chứa các biến tương ứng với template. Ví dụ: {"customer":"Nguyễn Văn A","amount":"100.000"}',
+				description: 'Object JSON chứa các biến tương ứng với template. Ví dụ: {"customer":"Nguyễn Văn A","amount":"100.000"}.',
 				typeOptions: { rows: 5 },
 				displayOptions: { show: { resource: ['message'] } },
 			},
