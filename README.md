@@ -14,6 +14,8 @@
 - [Cài đặt](#cài-đặt)
 - [Cấu hình Credential](#cấu-hình-credential)
 - [Lấy Access Token và Refresh Token từ Zalo](#lấy-access-token-và-refresh-token-từ-zalo)
+  - [Cách 2: API Explorer (Khuyên dùng)](#cách-2-sử-dụng-api-explorer-khuyên-dùng)
+  - [Cách 1: OAuth v4 (Tích hợp hệ thống)](#cách-1-sử-dụng-oauth-v4-tích-hợp-hệ-thống)
 - [Operations](#operations)
 - [Ví dụ sử dụng](#ví-dụ-sử-dụng)
 - [Compatibility](#compatibility)
@@ -69,35 +71,95 @@ Sau khi cài node, tạo credential **Zalo OA API** với các thông tin sau:
 
 ## Lấy Access Token và Refresh Token từ Zalo
 
-Zalo dùng OAuth2 với flow **Authorization Code + PKCE** không chuẩn. Cách lấy token:
+Zalo sử dụng OAuth2 kết hợp PKCE để cấp quyền. Có **2 cách** lấy token:
 
-### Bước 1 — Tạo App trên Zalo Developer
+> 📌 **Thuật ngữ quan trọng:**
+>
+> - **Access Token:** Có hiệu lực **25 giờ**. Dùng để gọi API.
+> - **Refresh Token:** Có hiệu lực **3 tháng**. Chỉ dùng **1 lần** để lấy Access Token mới (và sẽ nhận Refresh Token mới).
+> - **Authorization Code:** Chỉ dùng **1 lần**, hết hạn sau **10 phút**.
+
+---
+
+### Cách 2: Sử dụng API Explorer (Khuyên dùng)
+
+> 💡 **Phù hợp cho:** Admin của OA hoặc Admin của Ứng dụng muốn lấy token nhanh mà không cần cấu hình server.
+
+**Các bước thực hiện:**
+
+1. Truy cập **[Zalo API Explorer](https://developers.zalo.me/tools/explorer)**
+   *(Vào Zalo for Developers → Công cụ & Hỗ trợ → API Explorer)*
+
+2. Tại màn hình API Explorer, chọn **Ứng dụng** của bạn
+
+   ![Chọn ứng dụng trong API Explorer](docs/images/guides/api-explorer-step2-select-app.png)
+
+3. Tại mục **Loại access token**, chọn **OA Access Token**
+
+   ![Chọn OA Access Token](docs/images/guides/api-explorer-step3-select-token-type.png)
+
+4. Chọn **Official Account (OA)** mà bạn muốn liên kết và cấp quyền
+
+   ![Chọn OA](docs/images/guides/api-explorer-step4-select-oa.png)
+
+5. Hệ thống hiển thị trang yêu cầu cấp quyền → kiểm tra các quyền → nhấn **Cho phép**
+
+6. Sau khi nhấn "Cho phép", công cụ hiển thị:
+   - **Access Token** → nhấn biểu tượng 📋 Copy để lấy
+   - **Refresh Token** → nhấn biểu tượng 📋 Copy để lưu lại
+
+   ![Kết quả Access Token và Refresh Token](docs/images/guides/api-explorer-step6-result-tokens.png)
+
+7. Dán **Access Token** và **Refresh Token** vào tương ứng trong credential n8n
+
+   ![Điền token vào credential n8n](docs/images/guides/n8n-credential-fill-tokens.png)
+
+> ⚠️ **Lưu ý:** Access Token từ API Explorer hết hạn sau **25 giờ**. Node sẽ tự động dùng Refresh Token để gia hạn khi phát hiện lỗi hết hạn (mã lỗi `-124` hoặc `3`).
+
+---
+
+### Cách 1: Sử dụng OAuth v4 (Tích hợp hệ thống)
+
+> 💡 **Phù hợp cho:** Tích hợp tự động, cần lấy token theo dạng programmatic.
+
+#### Bước 1 — Tạo App trên Zalo Developer
 
 1. Đăng nhập tại [developers.zalo.me](https://developers.zalo.me)
 2. Tạo ứng dụng mới → lấy **App ID** và **Secret Key**
 3. Vào mục **Official Account → Liên kết OA** → liên kết OA của bạn với App
+4. Thiết lập **Callback URL** trong phần cài đặt ứng dụng
 
-### Bước 2 — Lấy Authorization Code
+#### Bước 2 — Tạo Code Verifier & Code Challenge (PKCE)
 
-Truy cập URL sau trên trình duyệt (thay `YOUR_APP_ID`):
+```bash
+# Tạo code_verifier (chuỗi ngẫu nhiên)
+code_verifier=$(openssl rand -base64 64 | tr -d '=+/' | cut -c1-64)
 
-```
-https://oauth.zaloapp.com/v4/oa/permission?app_id=YOUR_APP_ID&redirect_uri=https://yourdomain.com/callback
-```
-
-Sau khi user đồng ý, Zalo redirect về:
-
-```
-https://yourdomain.com/callback?code=AUTHORIZATION_CODE
+# Tạo code_challenge (SHA-256 + Base64 không padding)
+code_challenge=$(echo -n "$code_verifier" | openssl sha256 -binary | base64 | tr '+/' '-_' | tr -d '=')
 ```
 
-### Bước 3 — Đổi Code lấy Tokens
+#### Bước 3 — Lấy Authorization Code
+
+Gửi URL sau cho Admin OA để họ nhấn "Cho phép":
+
+```
+https://oauth.zaloapp.com/v4/oa/permission?app_id=YOUR_APP_ID&redirect_uri=YOUR_CALLBACK_URL&code_challenge=YOUR_CODE_CHALLENGE
+```
+
+Zalo sẽ redirect về Callback URL kèm mã `code`:
+
+```
+https://your-callback.com/callback?code=AUTHORIZATION_CODE
+```
+
+#### Bước 4 — Đổi Code lấy Tokens
 
 ```bash
 curl -X POST https://oauth.zaloapp.com/v4/oa/access_token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -H "secret_key: YOUR_SECRET_KEY" \
-  -d "app_id=YOUR_APP_ID&code=AUTHORIZATION_CODE&grant_type=authorization_code"
+  -d "app_id=YOUR_APP_ID&code=AUTHORIZATION_CODE&grant_type=authorization_code&code_verifier=YOUR_CODE_VERIFIER"
 ```
 
 Response:
@@ -106,13 +168,22 @@ Response:
 {
   "access_token": "...",
   "refresh_token": "...",
-  "expires_in": 86400
+  "expires_in": 90000
 }
 ```
 
-Copy `access_token` và `refresh_token` vào credential.
+Copy `access_token` và `refresh_token` vào credential n8n.
 
-> **Lưu ý:** Access Token có hiệu lực **7 ngày**, Refresh Token có hiệu lực **3 tháng**. Node sẽ tự động refresh khi phát hiện token hết hạn (lỗi `-124` hoặc `3`).
+#### Gia hạn Token bằng Refresh Token
+
+```bash
+curl -X POST https://oauth.zaloapp.com/v4/oa/access_token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -H "secret_key: YOUR_SECRET_KEY" \
+  -d "app_id=YOUR_APP_ID&refresh_token=YOUR_REFRESH_TOKEN&grant_type=refresh_token"
+```
+
+> ✅ Node n8n đã tích hợp sẵn tính năng **tự động gia hạn token** — bạn không cần chạy lệnh trên thủ công. Xem phần [Operations → Refresh Token](#resource-token).
 
 ---
 
@@ -207,13 +278,22 @@ Nếu node này giúp ích cho công việc của bạn, hãy ủng hộ tác gi
 | **Chủ tài khoản** | TRAN NGOC BAU |
 | **Nội dung CK** | `donate n8n zalo oa` |
 
+### 📱 Quét QR để chuyển khoản nhanh
+
+<p align="center">
+  <img src="docs/images/donate/qr-mbbank.png" alt="QR MB Bank" width="220"/>
+</p>
+<p align="center">
+  <em>MB Bank</em>
+</p>
+
 > 💡 Bạn cũng có thể dùng **MoMo**, **ZaloPay**, hoặc **VietQR** để chuyển khoản nhanh qua số tài khoản trên.
 
 ---
 
 ## Version History
 
-### v1.0.5 (2026-04-07)
+### v1.0.6 (2026-04-07)
 
 - 🎉 Ra mắt lần đầu
 - ✅ Gửi ZBS Template Message qua số điện thoại
