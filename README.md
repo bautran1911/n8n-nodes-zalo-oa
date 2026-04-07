@@ -213,7 +213,7 @@ Nếu node này giúp ích cho công việc của bạn, hãy ủng hộ tác gi
 
 ## Version History
 
-### v0.1.0 (2026-04)
+### v1.0.4 (2026-04-07)
 
 - 🎉 Ra mắt lần đầu
 - ✅ Gửi ZBS Template Message qua số điện thoại
