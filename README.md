@@ -254,7 +254,7 @@ Tạo workflow với:
 
 ## Tài nguyên
 
-- [Tài liệu Zalo ZBS API](https://developers.zalo.me/docs/zbs/)
+- [Tài liệu Zalo ZBS API](https://developers.zalo.me/docs/zbs-template-message/)
 - [Zalo OA API Reference](https://developers.zalo.me/docs/official-account/)
 - [n8n Community Nodes Docs](https://docs.n8n.io/integrations/community-nodes/)
 - [GitHub Repository](https://github.com/bautran1911/n8n-nodes-zalo-oa)
