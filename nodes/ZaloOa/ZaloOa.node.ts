@@ -255,13 +255,13 @@ export class ZaloOa implements INodeType {
 
 			// ── Số điện thoại người nhận ─────────────────────────────────────────────
 			{
-				displayName: 'Số Điện Thoại Người Nhận',
+				displayName: 'Số ĐIện Thoại Người Nhận',
 				name: 'phone',
 				type: 'string',
 				required: true,
 				default: '',
 				placeholder: '84987654321',
-				description: 'Số điện thoại người nhận định dạng quốc tế (ví dụ: 84987654321 hoặc +84987654321).',
+				description: 'Số điện thoại người nhận định dạng quốc tế (ví dụ: 84987654321 hoặc +84987654321)',
 				displayOptions: { show: { resource: ['message'] } },
 			},
 
