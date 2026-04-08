@@ -9,6 +9,7 @@ import type {
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 const ZALO_ZBS_API_BASE = 'https://business.openapi.zalo.me';
+const ZALO_OA_API_BASE = 'https://openapi.zalo.me';
 const ZALO_TOKEN_URL = 'https://oauth.zaloapp.com/v4/oa/access_token';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -132,26 +133,33 @@ async function writeTokensToCredential(
 }
 
 /**
- * Gọi Zalo ZBS API. Nếu token hết hạn (error -124 / 3), tự động refresh
+ * Gọi Zalo API. Nếu token hết hạn (error -124 / 3), tự động refresh
  * và ghi token mới về credential, rồi retry.
  */
-async function callZaloZbsApi(
+async function callZaloApi(
 	ctx: IExecuteFunctions,
+	method: 'GET' | 'POST',
+	baseUrl: string,
 	endpoint: string,
-	body: IDataObject,
+	payload: IDataObject,
 	creds: ZaloCredentials,
 	retried = false,
 ): Promise<IDataObject> {
 	const options: IHttpRequestOptions = {
-		method: 'POST',
-		url: `${ZALO_ZBS_API_BASE}${endpoint}`,
+		method,
+		url: `${baseUrl}${endpoint}`,
 		headers: {
 			access_token: creds.accessToken,
 			'Content-Type': 'application/json',
 		},
-		body,
 		json: true,
 	};
+
+	if (method === 'POST') {
+		options.body = payload;
+	} else if (method === 'GET') {
+		options.qs = payload;
+	}
 
 	let response: IDataObject;
 
@@ -161,14 +169,18 @@ async function callZaloZbsApi(
 		throw new NodeOperationError(ctx.getNode(), err as Error);
 	}
 
-	// Zalo trả error -124 hoặc 3 = token hết hạn
+	// Zalo trả error -124, 3, -216, hoặc -220 = token hết hạn/không hợp lệ
 	const errorCode = response.error;
 	const isTokenExpired =
 		!retried &&
 		(errorCode === -124 ||
 			errorCode === 3 ||
+			errorCode === -216 ||
+			errorCode === -220 ||
 			errorCode === '-124' ||
-			errorCode === '3');
+			errorCode === '3' ||
+			errorCode === '-216' ||
+			errorCode === '-220');
 
 	if (isTokenExpired) {
 		const newTokens = await refreshAccessToken(ctx, creds);
@@ -180,7 +192,7 @@ async function callZaloZbsApi(
 
 		await writeTokensToCredential(ctx, creds, newAccessToken, newRefreshToken);
 
-		return await callZaloZbsApi(ctx, endpoint, body, creds, true);
+		return await callZaloApi(ctx, method, baseUrl, endpoint, payload, creds, true);
 	}
 
 	return response;
@@ -197,8 +209,8 @@ export class ZaloOa implements INodeType {
 		icon: 'file:zaloOa.svg',
 		group: ['transform'],
 		version: 1,
-		subtitle: '={{$parameter["resource"] === "token" ? "Refresh Token" : "Gửi ZBS Template"}}',
-		description: 'Gửi tin ZBS Template Message qua SĐT và quản lý token (Zalo Business Solution)',
+		subtitle: '={{$parameter["resource"] === "token" ? "Refresh Token" : ($parameter["resource"] === "user" ? "Người Dùng OA" : "Gửi ZBS Template")}}',
+		description: 'Gửi tin ZBS Template Message qua SĐT, quản lý người dùng OA và token',
 		defaults: {
 			name: 'Zalo OA',
 		},
@@ -208,13 +220,27 @@ export class ZaloOa implements INodeType {
 		credentials: [{ name: 'zaloOaApi', required: true }],
 		properties: [
 
-			// ── RESOURCE ─────────────────────────────────────────────────────────────
 			{
 				displayName: 'Resource',
 				name: 'resource',
 				type: 'options',
 				noDataExpression: true,
 				options: [
+					{
+						name: 'Thông Tin OA',
+						value: 'oa',
+						description: 'Lấy thông tin profile Zalo Official Account',
+					},
+					{
+						name: 'Hội Thoại (Conversation)',
+						value: 'conversation',
+						description: 'Lấy thông tin tin nhắn trong hội thoại',
+					},
+					{
+						name: 'Người Dùng (OA)',
+						value: 'user',
+						description: 'Quản lý thông tin người dùng của OA, truy xuất danh sách...',
+					},
 					{
 						name: 'Tin Nhắn ZBS Template',
 						value: 'message',
@@ -227,6 +253,168 @@ export class ZaloOa implements INodeType {
 					},
 				],
 				default: 'message',
+			},
+
+			// ── CẢNH BÁO RATE LIMIT ──────────────────────────────────────────────────
+			{
+				displayName: '⚠️ Lưu ý: Zalo áp dụng Giới hạn tốc độ gọi API (Rate Limit). Vui lòng không spam hoặc tạo quá nhiều kết nối cùng lúc để tránh bị chặn. Chi tiết tham khảo: https://developers.zalo.me/docs/official-account/phu-luc/gioi-han-toc-do-api',
+				name: 'rateLimitNotice',
+				type: 'notice',
+				default: '',
+			},
+
+			// ══════════════════════════════════════════════════════════════════════════
+			// OA – Thông Tin OA
+			// ══════════════════════════════════════════════════════════════════════════
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: { show: { resource: ['oa'] } },
+				options: [
+					{
+						name: 'Lấy Thông Tin OA',
+						value: 'getOa',
+						description: 'Truy xuất thông tin chung của Zalo Official Account (Tên, Avatar, Cover...)',
+						action: 'Lấy thông tin tài khoản OA',
+					},
+				],
+				default: 'getOa',
+			},
+
+			// ══════════════════════════════════════════════════════════════════════════
+			// CONVERSATION – Hội Thoại
+			// ══════════════════════════════════════════════════════════════════════════
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: { show: { resource: ['conversation'] } },
+				options: [
+					{
+						name: 'Lấy Chi Tiết Hội Thoại',
+						value: 'getConversation',
+						description: 'Lấy thông tin tin nhắn trong một hội thoại với một người dùng cụ thể',
+						action: 'Lấy chi tiết hội thoại',
+					},
+				],
+				default: 'getConversation',
+			},
+			{
+				displayName: 'User ID',
+				name: 'userId',
+				type: 'string',
+				required: true,
+				default: '',
+				description: 'Zalo User ID (ID người dùng quan tâm OA) để lấy tin nhắn',
+				displayOptions: { show: { resource: ['conversation'], operation: ['getConversation'] } },
+			},
+			{
+				displayName: 'Offset (Vị Trí Bắt Đầu)',
+				name: 'offset',
+				type: 'number',
+				default: 0,
+				description: 'Vị trí bắt đầu lấy tin nhắn (mặc định 0 - tin nhắn gần nhất)',
+				displayOptions: { show: { resource: ['conversation'], operation: ['getConversation'] } },
+			},
+			{
+				displayName: 'Số Lượng (Count)',
+				name: 'count',
+				type: 'number',
+				typeOptions: { maxValue: 10 },
+				default: 5,
+				description: 'Số lượng tin nhắn muốn lấy. Tối đa 10 tin nhắn mỗi lần gọi.',
+				displayOptions: { show: { resource: ['conversation'], operation: ['getConversation'] } },
+			},
+
+			// ══════════════════════════════════════════════════════════════════════════
+			// USER – Người Dùng OA
+			// ══════════════════════════════════════════════════════════════════════════
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: { show: { resource: ['user'] } },
+				options: [
+					{
+						name: 'Truy Xuất Chi Tiết Người Dùng',
+						value: 'getDetail',
+						description: 'Lấy thông tin chi tiết của một người dùng theo User ID',
+						action: 'Lấy chi tiết người dùng',
+					},
+					{
+						name: 'Truy Xuất Danh Sách Người Dùng',
+						value: 'getList',
+						description: 'Lấy danh sách người dùng đã gửi tin nhắn hoặc quan tâm Zalo OA',
+						action: 'Lấy danh sách người dùng',
+					},
+				],
+				default: 'getDetail',
+			},
+			{
+				displayName: 'User ID',
+				name: 'userId',
+				type: 'string',
+				required: true,
+				default: '',
+				description: 'ID của người dùng cần lấy thông tin chi tiết',
+				displayOptions: { show: { resource: ['user'], operation: ['getDetail'] } },
+			},
+			{
+				displayName: 'Offset (Vị Trí Bắt Đầu)',
+				name: 'offset',
+				type: 'number',
+				default: 0,
+				description: 'Vị trí bắt đầu lấy (mặc định 0, tối đa 9951)',
+				displayOptions: { show: { resource: ['user'], operation: ['getList'] } },
+			},
+			{
+				displayName: 'Số Lượng (Count)',
+				name: 'count',
+				type: 'number',
+				typeOptions: { maxValue: 50 },
+				default: 50,
+				description: 'Số lượng người dùng cần lấy. Tối đa 50.',
+				displayOptions: { show: { resource: ['user'], operation: ['getList'] } },
+			},
+			{
+				displayName: 'Tên Nhãn (Tag Name)',
+				name: 'tagName',
+				type: 'string',
+				default: '',
+				description: 'Lọc danh sách theo nhãn cụ thể (tuỳ chọn)',
+				displayOptions: { show: { resource: ['user'], operation: ['getList'] } },
+			},
+			{
+				displayName: 'Tương Tác Gần Nhất (Last Interaction)',
+				name: 'lastInteractionPeriod',
+				type: 'options',
+				options: [
+					{ name: 'Tất Cả (Tùy Chỉnh / Bỏ Qua)', value: '' },
+					{ name: 'Trong Ngày (TODAY)', value: 'TODAY' },
+					{ name: 'Hôm Qua (YESTERDAY)', value: 'YESTERDAY' },
+					{ name: '7 Ngày Gần Nhất (L7D)', value: 'L7D' },
+					{ name: '30 Ngày Gần Nhất (L30D)', value: 'L30D' },
+				],
+				default: '',
+				description: 'Lọc theo thời gian tương tác',
+				displayOptions: { show: { resource: ['user'], operation: ['getList'] } },
+			},
+			{
+				displayName: 'Trạng Thái Quan Tâm',
+				name: 'isFollower',
+				type: 'options',
+				options: [
+					{ name: 'Tất Cả', value: '' },
+					{ name: 'Đã Quan Tâm', value: 'true' },
+					{ name: 'Chưa Quan Tâm (Người Vãng Lai)', value: 'false' },
+				],
+				default: '',
+				description: 'Lọc theo trạng thái quan tâm Zalo OA',
+				displayOptions: { show: { resource: ['user'], operation: ['getList'] } },
 			},
 
 			// ══════════════════════════════════════════════════════════════════════════
@@ -406,12 +594,101 @@ export class ZaloOa implements INodeType {
 					requestBody.tracking_id = trackingId;
 				}
 
-				result = await callZaloZbsApi(
+				result = await callZaloApi(
 					this,
+					'POST',
+					ZALO_ZBS_API_BASE,
 					'/message/template',
 					requestBody,
 					creds,
 				);
+			}
+
+			// ── OA: Thông tin OA ──────────────────────────────────────────
+			else if (resource === 'oa') {
+				const operation = this.getNodeParameter('operation', i) as string;
+
+				if (operation === 'getOa') {
+					result = await callZaloApi(
+						this,
+						'GET',
+						ZALO_OA_API_BASE,
+						'/v2.0/oa/getoa',
+						{},
+						creds,
+					);
+				}
+			}
+
+			// ── CONVERSATION: Hội thoại ──────────────────────────────────────────────
+			else if (resource === 'conversation') {
+				const operation = this.getNodeParameter('operation', i) as string;
+
+				if (operation === 'getConversation') {
+					const userId = this.getNodeParameter('userId', i) as string;
+					const offset = this.getNodeParameter('offset', i) as number;
+					const count = this.getNodeParameter('count', i) as number;
+
+					const reqData: IDataObject = {
+						user_id: userId,
+						offset,
+						count,
+					};
+
+					result = await callZaloApi(
+						this,
+						'GET',
+						ZALO_OA_API_BASE,
+						'/v2.0/oa/conversation',
+						{ data: JSON.stringify(reqData) },
+						creds,
+					);
+				}
+			}
+
+			// ── USER: Quản lý người dùng OA ──────────────────────────────────────────
+			else if (resource === 'user') {
+				const operation = this.getNodeParameter('operation', i) as string;
+
+				if (operation === 'getList') {
+					const offset = this.getNodeParameter('offset', i) as number;
+					const count = this.getNodeParameter('count', i) as number;
+					const tagName = this.getNodeParameter('tagName', i) as string;
+					const lastInteractionPeriod = this.getNodeParameter('lastInteractionPeriod', i) as string;
+					const isFollower = this.getNodeParameter('isFollower', i) as string;
+
+					const reqData: IDataObject = {
+						offset,
+						count,
+					};
+					if (tagName) reqData.tag_name = tagName;
+					if (lastInteractionPeriod) reqData.last_interaction_period = lastInteractionPeriod;
+					if (isFollower) reqData.is_follower = isFollower;
+
+					result = await callZaloApi(
+						this,
+						'GET',
+						ZALO_OA_API_BASE,
+						'/v3.0/oa/user/getlist',
+						{ data: JSON.stringify(reqData) },
+						creds,
+					);
+				} else if (operation === 'getDetail') {
+					const userId = this.getNodeParameter('userId', i) as string;
+
+					const reqData: IDataObject = {
+						user_id: userId,
+					};
+
+					result = await callZaloApi(
+						this,
+						'GET',
+						ZALO_OA_API_BASE,
+						'/v3.0/oa/user/detail',
+						{ data: JSON.stringify(reqData) },
+						creds,
+					);
+				}
 			}
 
 			returnData.push({ json: result, pairedItem: { item: i } });

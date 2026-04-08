@@ -27,11 +27,14 @@
 
 ## Giới thiệu
 
-**Zalo OA** là Trang Zalo Official Account — nền tảng nhắn tin của Zalo dành cho doanh nghiệp. Node này tích hợp **Zalo ZBS (Zalo Business Solution)** API để:
+**Zalo OA** là Trang Zalo Official Account — nền tảng nhắn tin của Zalo dành cho doanh nghiệp. Node này tích hợp **Zalo OpenAPI / Zalo Business Solution (ZBS)** để:
 
 - 📨 Gửi **ZBS Template Message** qua số điện thoại người dùng
-- 🔄 Tự động **Refresh Access Token** khi hết hạn và ghi đè vào n8n credential
-- 🔐 Bảo mật token với cơ chế auto-retry
+- 👤 **Quản lý Người Dùng**: Truy xuất danh sách người quan tâm và lấy thông tin chi tiết từng người dùng
+- 💬 **Quản lý Hội Thoại**: Đọc nội dung tin nhắn đã trò chuyện với khách hàng
+- 🏢 **Thông Tin OA**: Lấy thông tin profile thiết lập của Official Account
+- 🔄 Tự động **Refresh Access Token** khi hết hạn và lưu đè vào n8n credential
+- 🔐 Chống gián đoạn dịch vụ với cơ chế auto-retry khi hết hạn token (áp dụng cho các mã lỗi -124, 3, -216, -220)
 
 ---
 
@@ -193,6 +196,16 @@ curl -X POST https://oauth.zaloapp.com/v4/oa/access_token \
 
 ## Operations
 
+### Resource: Thông Tin OA
+- **Lấy Thông Tin OA**: Truy xuất profile chung của Zalo OA (OA ID, Tên, Avatar, Cover, Số người quan tâm, Tình trạng xác thực...).
+
+### Resource: Hội Thoại (Conversation)
+- **Lấy Chi Tiết Hội Thoại**: Lấy lịch sử và nội dung tin nhắn trao đổi giữa Zalo OA và Khách hàng (yêu cầu `User ID`). Cho phép phân trang thông qua `Offset` và `Count` (tối đa 10 tin/lần).
+
+### Resource: Người Dùng (OA)
+- **Truy Xuất Chi Tiết Người Dùng**: Nhận thông tin đầy đủ về một người dùng (tên, ảnh, trạng thái theo dõi, thiết lập riêng...) theo `User ID`.
+- **Truy Xuất Danh Sách Người Dùng**: Thiết lập lấy danh sách kèm bộ lọc đa dạng (Offset, Count, Tag ID, Tương tác gần nhất TODAY/L7D/L30D, Is Follower).
+
 ### Resource: Tin Nhắn ZBS Template
 
 **Gửi ZBS Template Message** qua số điện thoại người nhận.
@@ -210,6 +223,20 @@ curl -X POST https://oauth.zaloapp.com/v4/oa/access_token \
 **Refresh Token** — Làm mới Access Token từ Refresh Token và tự động ghi đè vào credential.
 
 Sử dụng khi muốn chủ động làm mới token (ví dụ: chạy định kỳ mỗi 5 ngày).
+
+---
+
+## ⚠️ Lưu ý: Giới hạn tốc độ gọi API (Rate Limit)
+
+Zalo OA áp dụng các giới hạn tốc độ gọi API (Rate Limit) riêng nhằm duy trì ổn định hệ thống. Việc gọi API với tần suất quá cao (ví dụ: chạy qua Loop/Split in Batches tốc độ cao trong n8n) có thể làm ứng dụng vượt mức cho phép, kết quả là bạn sẽ nhận cảnh báo lỗi (Mã lỗi thông thường là `-32`).
+
+- **Gửi tin nhắn**: Bị giới hạn tương ứng với loại OA và quỹ tin nhắn.
+- **Truy xuất thông tin người dùng/Hội thoại**: Mức giới hạn quy định số request được phép trong 1 giây/phút/ngày.
+
+👉 Tham khảo chi tiết các hạn mức: [Giới hạn tốc độ gọi API (Zalo for Developers)](https://developers.zalo.me/docs/official-account/phu-luc/gioi-han-toc-do-api)
+
+💡 **Mẹo khi dùng n8n:**
+- Nếu bạn xử lý hàng loạt người dùng/tin nhắn, hãy tích hợp thêm node **Wait** (hoặc cấu hình Batches) để tạo độ trễ (delay) hợp lý giữa các lần gọi API, tránh rủi ro bị chặn bởi Zalo.
 
 ---
 
@@ -296,6 +323,14 @@ Nếu node này giúp ích cho công việc của bạn, hãy ủng hộ tác gi
 ---
 
 ## Version History
+
+### v1.0.10 (2026-04)
+
+- 🚀 Thêm API: Lấy thông tin Zalo Official Account
+- 🚀 Thêm API: Lấy danh sách người dùng & chi tiết người dùng
+- 🚀 Thêm API: Lấy thông tin tin nhắn trong một hội thoại
+- 🔄 Bổ sung hỗ trợ tự động Refresh Token với các mã lỗi `-216`, `-220` (bên cạnh `-124`, `3`)
+- ⚠️ Cập nhật cảnh báo Giới hạn tốc độ gọi API (Rate Limit) cho n8n workflow
 
 ### v1.0.9 (2026-04)
 
