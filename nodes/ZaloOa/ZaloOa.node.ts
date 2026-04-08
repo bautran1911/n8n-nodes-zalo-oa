@@ -227,11 +227,6 @@ export class ZaloOa implements INodeType {
 				noDataExpression: true,
 				options: [
 					{
-						name: 'Thông Tin OA',
-						value: 'oa',
-						description: 'Lấy thông tin profile Zalo Official Account',
-					},
-					{
 						name: 'Hội Thoại (Conversation)',
 						value: 'conversation',
 						description: 'Lấy thông tin tin nhắn trong hội thoại',
@@ -239,7 +234,12 @@ export class ZaloOa implements INodeType {
 					{
 						name: 'Người Dùng (OA)',
 						value: 'user',
-						description: 'Quản lý thông tin người dùng của OA, truy xuất danh sách...',
+						description: 'Quản lý thông tin người dùng của oa, truy xuất danh sách',
+					},
+					{
+						name: 'Thông Tin OA',
+						value: 'oa',
+						description: 'Lấy thông tin profile Zalo Official Account',
 					},
 					{
 						name: 'Tin Nhắn ZBS Template',
@@ -277,7 +277,7 @@ export class ZaloOa implements INodeType {
 						name: 'Lấy Thông Tin OA',
 						value: 'getOa',
 						description: 'Truy xuất thông tin chung của Zalo Official Account (Tên, Avatar, Cover...)',
-						action: 'Lấy thông tin tài khoản OA',
+						action: 'Get OA information',
 					},
 				],
 				default: 'getOa',
@@ -297,7 +297,7 @@ export class ZaloOa implements INodeType {
 						name: 'Lấy Chi Tiết Hội Thoại',
 						value: 'getConversation',
 						description: 'Lấy thông tin tin nhắn trong một hội thoại với một người dùng cụ thể',
-						action: 'Lấy chi tiết hội thoại',
+						action: 'Get conversation details',
 					},
 				],
 				default: 'getConversation',
@@ -312,7 +312,7 @@ export class ZaloOa implements INodeType {
 				displayOptions: { show: { resource: ['conversation'], operation: ['getConversation'] } },
 			},
 			{
-				displayName: 'Offset (Vị Trí Bắt Đầu)',
+				displayName: 'Offset',
 				name: 'offset',
 				type: 'number',
 				default: 0,
@@ -343,13 +343,13 @@ export class ZaloOa implements INodeType {
 						name: 'Truy Xuất Chi Tiết Người Dùng',
 						value: 'getDetail',
 						description: 'Lấy thông tin chi tiết của một người dùng theo User ID',
-						action: 'Lấy chi tiết người dùng',
+						action: 'Get user details',
 					},
 					{
 						name: 'Truy Xuất Danh Sách Người Dùng',
 						value: 'getList',
 						description: 'Lấy danh sách người dùng đã gửi tin nhắn hoặc quan tâm Zalo OA',
-						action: 'Lấy danh sách người dùng',
+						action: 'Get user list',
 					},
 				],
 				default: 'getDetail',
@@ -364,7 +364,7 @@ export class ZaloOa implements INodeType {
 				displayOptions: { show: { resource: ['user'], operation: ['getDetail'] } },
 			},
 			{
-				displayName: 'Offset (Vị Trí Bắt Đầu)',
+				displayName: 'Vị Trí (Offset)',
 				name: 'offset',
 				type: 'number',
 				default: 0,
@@ -393,11 +393,11 @@ export class ZaloOa implements INodeType {
 				name: 'lastInteractionPeriod',
 				type: 'options',
 				options: [
+					{ name: '30 Ngày Gần Nhất (L30D)', value: 'L30D' },
+					{ name: '7 Ngày Gần Nhất (L7D)', value: 'L7D' },
+					{ name: 'Hôm Qua (YESTERDAY)', value: 'YESTERDAY' },
 					{ name: 'Tất Cả (Tùy Chỉnh / Bỏ Qua)', value: '' },
 					{ name: 'Trong Ngày (TODAY)', value: 'TODAY' },
-					{ name: 'Hôm Qua (YESTERDAY)', value: 'YESTERDAY' },
-					{ name: '7 Ngày Gần Nhất (L7D)', value: 'L7D' },
-					{ name: '30 Ngày Gần Nhất (L30D)', value: 'L30D' },
 				],
 				default: '',
 				description: 'Lọc theo thời gian tương tác',
@@ -409,7 +409,7 @@ export class ZaloOa implements INodeType {
 				type: 'options',
 				options: [
 					{ name: 'Tất Cả', value: '' },
-					{ name: 'Đã Quan Tâm', value: 'true' },
+					{ name: 'Quan Tâm', value: 'true' },
 					{ name: 'Chưa Quan Tâm (Người Vãng Lai)', value: 'false' },
 				],
 				default: '',
