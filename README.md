@@ -324,7 +324,7 @@ Nếu node này giúp ích cho công việc của bạn, hãy ủng hộ tác gi
 
 ## Version History
 
-### v1.0.10 (2026-04)
+### v1.0.11 (2026-04)
 
 - 🚀 Thêm API: Lấy thông tin Zalo Official Account
 - 🚀 Thêm API: Lấy danh sách người dùng & chi tiết người dùng

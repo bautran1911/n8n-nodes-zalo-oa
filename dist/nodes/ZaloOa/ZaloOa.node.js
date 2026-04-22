@@ -304,9 +304,9 @@ class ZaloOa {
                     name: 'isFollower',
                     type: 'options',
                     options: [
-                        { name: 'Tất Cả', value: '' },
-                        { name: 'Quan Tâm', value: 'true' },
                         { name: 'Chưa Quan Tâm (Người Vãng Lai)', value: 'false' },
+                        { name: 'Quan Tâm', value: 'true' },
+                        { name: 'Tất Cả', value: '' },
                     ],
                     default: '',
                     description: 'Lọc theo trạng thái quan tâm Zalo OA',
