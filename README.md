@@ -16,6 +16,8 @@
 - [Lấy Access Token và Refresh Token từ Zalo](#lấy-access-token-và-refresh-token-từ-zalo)
   - [Cách 2: API Explorer (Khuyên dùng)](#cách-2-sử-dụng-api-explorer-khuyên-dùng)
   - [Cách 1: OAuth v4 (Tích hợp hệ thống)](#cách-1-sử-dụng-oauth-v4-tích-hợp-hệ-thống)
+- [Zalo OA Trigger (Webhook)](#zalo-oa-trigger-webhook)
+- [Workflow chatbot AI với Zalo OA](#workflow-chatbot-ai-với-zalo-oa)
 - [Operations](#operations)
 - [Ví dụ sử dụng](#ví-dụ-sử-dụng)
 - [Compatibility](#compatibility)
@@ -198,6 +200,70 @@ curl -X POST https://oauth.zaloapp.com/v4/oa/access_token \
 ```
 
 > ✅ Node n8n đã tích hợp sẵn tính năng **tự động gia hạn token** — bạn không cần chạy lệnh trên thủ công. Xem phần [Operations → Refresh Token](#resource-token).
+
+---
+
+## Zalo OA Trigger (Webhook)
+
+Node **Zalo OA Trigger** nhận webhook realtime từ Zalo Official Account. Cổng ra (Main) truyền dữ liệu sang bất kỳ node nào khác (AI Agent, IF, Switch, Code, Set...) để xử lý và phản hồi.
+
+### Cấu hình webhook trên Zalo OA
+
+1. Kéo node **Zalo OA Trigger** vào workflow → copy **Production URL**.
+2. Vào [Zalo OA Management](https://oa.zalo.me) → chọn OA → **Quản lý ứng dụng → Cấu hình Webhook** → dán URL vào và chọn các sự kiện cần nhận.
+3. Quay lại n8n, mở node, chọn **Events** muốn lọc (hoặc `All User Send Events` để nhận mọi loại tin user gửi).
+
+### Tham số
+
+| Tham số | Mô tả |
+|---------|-------|
+| **Events** | Lọc theo `event_name`. Option đặc biệt `All User Send Events` gộp toàn bộ `user_send_*`. Để rỗng sẽ nhận mọi event. |
+| **Ignore OA Echo** | Bỏ qua event `oa_send_*` (và các event có `sender.id == recipient.id`) để tránh vòng lặp khi node `Zalo OA` tự phát sinh event. |
+| **Verify Signature** | Xác thực header `X-ZEvent-Signature` dùng `secret_key` trong credential. So khớp `SHA256(rawBody + timestamp + secretKey)` và fallback `HMAC-SHA256(rawBody, secretKey)`. |
+| **Simplify** | Trả output dạng rút gọn với các field phẳng tiện cho AI (xem bên dưới) thay vì raw body. |
+
+### Cấu trúc output (Simplify = ON)
+
+```json
+{
+  "event_name": "user_send_text",
+  "app_id": "1234567890",
+  "sender_id": "6123456789",
+  "recipient_id": "1234567890",
+  "user_id_by_app": "",
+  "timestamp": "1713456789000",
+  "user_id": "6123456789",
+  "text": "Shop ơi cho em hỏi giá...",
+  "msg_id": "abc-xyz",
+  "attachments": [],
+  "message": { "text": "...", "msg_id": "...", "attachments": [] },
+  "raw": { "...": "toàn bộ body gốc" }
+}
+```
+
+> 🤖 Các field tiện lợi: `user_id` (tự chọn `sender.id` hoặc `recipient.id` tùy event), `text`, `msg_id`, `attachments` — dùng trực tiếp làm input cho AI Agent / LLM và đầu vào cho node `Zalo OA` resource **Tin Tư Vấn** để phản hồi khách hàng.
+
+---
+
+## Workflow chatbot AI với Zalo OA
+
+```
+[Zalo OA Trigger]
+      │ user_id, text
+      ▼
+[AI Agent / LLM]  (prompt = "Bạn là nhân viên CSKH... Khách hỏi: {{$json.text}}")
+      │ output = câu trả lời
+      ▼
+[Zalo OA]  Resource = Tin Tư Vấn → Operation = Gửi Tin Tư Vấn Dạng Văn Bản
+          User ID = {{ $('Zalo OA Trigger').item.json.user_id }}
+          Nội dung = {{ $json.output }}
+```
+
+Mẹo:
+- Bật **Ignore OA Echo** trên trigger để không bị kích hoạt lại bởi `oa_send_text` sau khi bạn gửi reply.
+- Chọn **Events = User Send Text** để không bị trigger bởi follow/seen/received.
+- Dùng node **Code** để cắt `text` ≤ 500 ký tự và/hoặc enrich thêm context (intent, session data, lịch sử từ Redis/Postgres) trước khi vào AI Agent.
+- Dùng `$('Zalo OA Trigger').item.json.user_id` ở node sau cùng để giữ đúng `user_id` gốc, không bị mất qua các bước trung gian.
 
 ---
 
