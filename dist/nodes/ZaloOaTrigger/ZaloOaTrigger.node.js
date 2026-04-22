@@ -35,11 +35,6 @@ class ZaloOaTrigger {
                 {
                     name: 'zaloOaApi',
                     required: false,
-                    displayOptions: {
-                        show: {
-                            verifySignature: [true],
-                        },
-                    },
                 },
             ],
             webhooks: [
@@ -52,7 +47,7 @@ class ZaloOaTrigger {
             ],
             properties: [
                 {
-                    displayName: 'Cấu hình URL Webhook này trong Zalo Official Account → Cài đặt Webhook. Mặc định node chỉ phản hồi 200 OK để Zalo không gửi lại. Tài liệu: <a href="https://developers.zalo.me/docs/official-account/webhook/tin-nhan/su-kien-nguoi-dung-gui-tin-nhan" target="_blank">Sự kiện người dùng gửi tin nhắn</a>.',
+                    displayName: 'Trigger webhook Zalo OA → dùng làm điểm khởi động workflow chatbot. Output có sẵn <code>user_id</code>, <code>text</code>, <code>msg_id</code> ở top-level để AI / LLM node xử lý, rồi chuyển tới node Zalo OA resource "Tin Tư Vấn (CS Message)" → operation "Gửi Tin Tư Vấn Dạng Văn Bản" để phản hồi (<code>csUserId = {{$json.user_id}}</code>, <code>csText = {{AI output}}</code>). Cấu hình URL này trong OA → Cài đặt Webhook. Tài liệu: <a href="https://developers.zalo.me/docs/official-account/webhook/tin-nhan/su-kien-nguoi-dung-gui-tin-nhan" target="_blank">Sự kiện người dùng gửi tin nhắn</a>.',
                     name: 'webhookNotice',
                     type: 'notice',
                     default: '',
@@ -113,7 +108,7 @@ class ZaloOaTrigger {
         };
     }
     async webhook() {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s;
         const req = this.getRequestObject();
         const body = ((_a = this.getBodyData()) !== null && _a !== void 0 ? _a : {});
         const headers = this.getHeaderData();
@@ -186,15 +181,26 @@ class ZaloOaTrigger {
                 };
             }
         }
+        const msg = ((_g = body.message) !== null && _g !== void 0 ? _g : {});
+        const attachments = (_h = msg.attachments) !== null && _h !== void 0 ? _h : [];
+        const msgText = (_j = msg.text) !== null && _j !== void 0 ? _j : '';
+        const msgId = (_k = msg.msg_id) !== null && _k !== void 0 ? _k : '';
+        const senderId = (_m = (_l = body.sender) === null || _l === void 0 ? void 0 : _l.id) !== null && _m !== void 0 ? _m : '';
+        const recipientId = (_p = (_o = body.recipient) === null || _o === void 0 ? void 0 : _o.id) !== null && _p !== void 0 ? _p : '';
+        const replyUserId = eventName.startsWith('oa_send_') ? recipientId : senderId;
         const output = simplify
             ? {
                 event_name: eventName,
-                app_id: (_g = body.app_id) !== null && _g !== void 0 ? _g : '',
-                sender_id: (_j = (_h = body.sender) === null || _h === void 0 ? void 0 : _h.id) !== null && _j !== void 0 ? _j : '',
-                recipient_id: (_l = (_k = body.recipient) === null || _k === void 0 ? void 0 : _k.id) !== null && _l !== void 0 ? _l : '',
-                user_id_by_app: (_m = body.user_id_by_app) !== null && _m !== void 0 ? _m : '',
-                timestamp: (_o = body.timestamp) !== null && _o !== void 0 ? _o : '',
-                message: (_p = body.message) !== null && _p !== void 0 ? _p : {},
+                app_id: (_q = body.app_id) !== null && _q !== void 0 ? _q : '',
+                sender_id: senderId,
+                recipient_id: recipientId,
+                user_id_by_app: (_r = body.user_id_by_app) !== null && _r !== void 0 ? _r : '',
+                timestamp: (_s = body.timestamp) !== null && _s !== void 0 ? _s : '',
+                user_id: replyUserId,
+                text: msgText,
+                msg_id: msgId,
+                attachments,
+                message: msg,
                 raw: body,
             }
             : body;

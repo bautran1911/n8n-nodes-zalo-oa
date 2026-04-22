@@ -60,11 +60,6 @@ export class ZaloOaTrigger implements INodeType {
 			{
 				name: 'zaloOaApi',
 				required: false,
-				displayOptions: {
-					show: {
-						verifySignature: [true],
-					},
-				},
 			},
 		],
 		webhooks: [
@@ -78,7 +73,7 @@ export class ZaloOaTrigger implements INodeType {
 		properties: [
 			{
 				displayName:
-					'Cấu hình URL Webhook này trong Zalo Official Account → Cài đặt Webhook. Mặc định node chỉ phản hồi 200 OK để Zalo không gửi lại. Tài liệu: <a href="https://developers.zalo.me/docs/official-account/webhook/tin-nhan/su-kien-nguoi-dung-gui-tin-nhan" target="_blank">Sự kiện người dùng gửi tin nhắn</a>.',
+					'Trigger webhook Zalo OA → dùng làm điểm khởi động workflow chatbot. Output có sẵn <code>user_id</code>, <code>text</code>, <code>msg_id</code> ở top-level để AI / LLM node xử lý, rồi chuyển tới node Zalo OA resource "Tin Tư Vấn (CS Message)" → operation "Gửi Tin Tư Vấn Dạng Văn Bản" để phản hồi (<code>csUserId = {{$json.user_id}}</code>, <code>csText = {{AI output}}</code>). Cấu hình URL này trong OA → Cài đặt Webhook. Tài liệu: <a href="https://developers.zalo.me/docs/official-account/webhook/tin-nhan/su-kien-nguoi-dung-gui-tin-nhan" target="_blank">Sự kiện người dùng gửi tin nhắn</a>.',
 				name: 'webhookNotice',
 				type: 'notice',
 				default: '',
@@ -235,15 +230,31 @@ export class ZaloOaTrigger implements INodeType {
 		}
 
 		// ── Build output ───────────────────────────────────────────────────────
+		const msg = (body.message ?? {}) as IDataObject;
+		const attachments = (msg.attachments as IDataObject[]) ?? [];
+		const msgText = (msg.text as string) ?? '';
+		const msgId = (msg.msg_id as string) ?? '';
+
+		// user_id để reply qua API Tin Tư Vấn (/v3.0/oa/message/cs):
+		// với event user_send_* thì sender.id chính là Zalo user_id của khách.
+		const senderId = (body.sender?.id as string) ?? '';
+		const recipientId = (body.recipient?.id as string) ?? '';
+		const replyUserId = eventName.startsWith('oa_send_') ? recipientId : senderId;
+
 		const output: IDataObject = simplify
 			? {
 					event_name: eventName,
 					app_id: body.app_id ?? '',
-					sender_id: body.sender?.id ?? '',
-					recipient_id: body.recipient?.id ?? '',
+					sender_id: senderId,
+					recipient_id: recipientId,
 					user_id_by_app: body.user_id_by_app ?? '',
 					timestamp: body.timestamp ?? '',
-					message: body.message ?? {},
+					// Các field tiện cho AI agent / chatbot:
+					user_id: replyUserId, // dùng trực tiếp làm csUserId khi reply
+					text: msgText, // nội dung chữ user gửi (nếu có)
+					msg_id: msgId,
+					attachments,
+					message: msg,
 					raw: body,
 				}
 			: (body as IDataObject);

@@ -247,6 +247,11 @@ export class ZaloOa implements INodeType {
 						description: 'Gửi tin nhắn ZBS Template qua số điện thoại',
 					},
 					{
+						name: 'Tin Tư Vấn (CS Message)',
+						value: 'cs',
+						description: 'Gửi tin tư vấn (văn bản/hình ảnh) tới user_id trong cửa sổ 7 ngày kể từ lần tương tác gần nhất',
+					},
+					{
 						name: 'Token',
 						value: 'token',
 						description: 'Làm mới Access Token và ghi đè vào credential định kỳ',
@@ -415,6 +420,45 @@ export class ZaloOa implements INodeType {
 				default: '',
 				description: 'Lọc theo trạng thái quan tâm Zalo OA',
 				displayOptions: { show: { resource: ['user'], operation: ['getList'] } },
+			},
+
+			// ══════════════════════════════════════════════════════════════════════════
+			// CS – Tin Tư Vấn (Consultation Message)
+			// ══════════════════════════════════════════════════════════════════════════
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: { show: { resource: ['cs'] } },
+				options: [
+					{
+						name: 'Gửi Tin Tư Vấn Dạng Văn Bản',
+						value: 'sendText',
+						description: 'Gửi tin nhắn tư vấn dạng văn bản tới user_id (cửa sổ 7 ngày kể từ lần tương tác gần nhất)',
+						action: 'Send consultation text message',
+					},
+				],
+				default: 'sendText',
+			},
+			{
+				displayName: 'User ID',
+				name: 'csUserId',
+				type: 'string',
+				required: true,
+				default: '',
+				description: 'Zalo User ID của người nhận (phải đã tương tác với OA trong vòng 7 ngày)',
+				displayOptions: { show: { resource: ['cs'], operation: ['sendText'] } },
+			},
+			{
+				displayName: 'Nội Dung Văn Bản',
+				name: 'csText',
+				type: 'string',
+				required: true,
+				default: '',
+				typeOptions: { rows: 4 },
+				description: 'Nội dung tin nhắn văn bản cần gửi (tối đa 500 ký tự theo quy định Zalo)',
+				displayOptions: { show: { resource: ['cs'], operation: ['sendText'] } },
 			},
 
 			// ══════════════════════════════════════════════════════════════════════════
@@ -641,6 +685,30 @@ export class ZaloOa implements INodeType {
 						ZALO_OA_API_BASE,
 						'/v2.0/oa/conversation',
 						{ data: JSON.stringify(reqData) },
+						creds,
+					);
+				}
+			}
+
+			// ── CS: Tin Tư Vấn ──────────────────────────────────────────────────────
+			else if (resource === 'cs') {
+				const operation = this.getNodeParameter('operation', i) as string;
+
+				if (operation === 'sendText') {
+					const userId = this.getNodeParameter('csUserId', i) as string;
+					const text = this.getNodeParameter('csText', i) as string;
+
+					const requestBody: IDataObject = {
+						recipient: { user_id: userId },
+						message: { text },
+					};
+
+					result = await callZaloApi(
+						this,
+						'POST',
+						ZALO_OA_API_BASE,
+						'/v3.0/oa/message/cs',
+						requestBody,
 						creds,
 					);
 				}
