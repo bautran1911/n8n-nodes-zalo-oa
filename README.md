@@ -1,6 +1,6 @@
 # @bautran1911/n8n-nodes-zalo-oa
 
-**n8n community node** tích hợp **Zalo Official Account (Zalo OA)** vào workflow n8n — cho phép gửi ZBS Template Message qua số điện thoại và tự động quản lý Access Token.
+**n8n community node** tích hợp **Zalo Official Account (Zalo OA)** vào workflow n8n — hỗ trợ **Webhook Trigger** nhận tin nhắn từ người dùng, **gửi tin tư vấn (CS Message)** để tự động phản hồi chatbot AI, gửi **ZBS Template Message** qua số điện thoại và tự động quản lý Access Token.
 
 [![npm version](https://img.shields.io/npm/v/@bautran1911/n8n-nodes-zalo-oa)](https://www.npmjs.com/package/@bautran1911/n8n-nodes-zalo-oa)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
@@ -27,14 +27,21 @@
 
 ## Giới thiệu
 
-**Zalo OA** là Trang Zalo Official Account — nền tảng nhắn tin của Zalo dành cho doanh nghiệp. Node này tích hợp **Zalo OpenAPI / Zalo Business Solution (ZBS)** để:
+**Zalo OA** là Trang Zalo Official Account — nền tảng nhắn tin của Zalo dành cho doanh nghiệp. Package này cung cấp **2 node**:
 
-- 📨 Gửi **ZBS Template Message** qua số điện thoại người dùng
-- 👤 **Quản lý Người Dùng**: Truy xuất danh sách người quan tâm và lấy thông tin chi tiết từng người dùng
-- 💬 **Quản lý Hội Thoại**: Đọc nội dung tin nhắn đã trò chuyện với khách hàng
-- 🏢 **Thông Tin OA**: Lấy thông tin profile thiết lập của Official Account
-- 🔄 Tự động **Refresh Access Token** khi hết hạn và lưu đè vào n8n credential
-- 🔐 Chống gián đoạn dịch vụ với cơ chế auto-retry khi hết hạn token (áp dụng cho các mã lỗi -124, 3, -216, -220)
+1. **Zalo OA** (action node) — gọi các API của Zalo OpenAPI / Zalo Business Solution (ZBS).
+2. **Zalo OA Trigger** (webhook trigger) — nhận sự kiện webhook từ Zalo OA để khởi động workflow (chatbot AI, auto-reply, phân loại tin nhắn...).
+
+Tính năng chính:
+
+- ⚡ **Webhook Trigger**: Nhận realtime các sự kiện `user_send_text/image/link/audio/video/sticker/location/file/gif`, `follow`, `unfollow`, `user_submit_info`, `user_seen_message`,... Có xác thực chữ ký `X-ZEvent-Signature` và lọc event theo ý.
+- 💬 **Gửi Tin Tư Vấn (CS Message)**: Gửi tin nhắn văn bản tự do tới user đã tương tác với OA trong vòng 7 ngày (dùng cho chatbot AI phản hồi).
+- 📨 **ZBS Template Message**: Gửi tin mẫu đã duyệt qua số điện thoại.
+- 👤 **Quản lý Người Dùng**: Truy xuất danh sách người quan tâm, chi tiết người dùng.
+- 💭 **Quản lý Hội Thoại**: Đọc lịch sử tin nhắn đã trao đổi với khách hàng.
+- 🏢 **Thông Tin OA**: Lấy profile Zalo Official Account.
+- 🔄 **Tự động Refresh Access Token** khi hết hạn và ghi đè vào n8n credential.
+- 🔐 Auto-retry khi hết hạn token (áp dụng cho các mã lỗi `-124`, `3`, `-216`, `-220`).
 
 ---
 
@@ -205,6 +212,17 @@ curl -X POST https://oauth.zaloapp.com/v4/oa/access_token \
 ### Resource: Người Dùng (OA)
 - **Truy Xuất Chi Tiết Người Dùng**: Nhận thông tin đầy đủ về một người dùng (tên, ảnh, trạng thái theo dõi, thiết lập riêng...) theo `User ID`.
 - **Truy Xuất Danh Sách Người Dùng**: Thiết lập lấy danh sách kèm bộ lọc đa dạng (Offset, Count, Tag ID, Tương tác gần nhất TODAY/L7D/L30D, Is Follower).
+
+### Resource: Tin Tư Vấn (CS Message)
+
+**Gửi Tin Tư Vấn Dạng Văn Bản** — gửi tin nhắn văn bản tới một người dùng cụ thể thông qua `user_id`. Dùng cho workflow **chatbot AI** phản hồi lại tin nhắn khách gửi vào OA.
+
+| Tham số | Bắt buộc | Mô tả |
+|---------|----------|-------|
+| **User ID** | ✅ | Zalo User ID của người nhận — lấy trực tiếp từ output `user_id` của **Zalo OA Trigger** |
+| **Nội Dung Văn Bản** | ✅ | Nội dung tin nhắn văn bản (tối đa 500 ký tự theo Zalo) |
+
+> ⚠️ Điều kiện Zalo: chỉ gửi được tới user đã tương tác với OA trong **7 ngày** gần nhất. API endpoint: `POST https://openapi.zalo.me/v3.0/oa/message/cs` — xem [tài liệu Zalo](https://developers.zalo.me/docs/official-account/tin-nhan/tin-tu-van/gui-tin-tu-van-dang-van-ban).
 
 ### Resource: Tin Nhắn ZBS Template
 

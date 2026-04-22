@@ -41,6 +41,7 @@ const ALL_USER_SEND_EVENTS = [
 	'user_send_contact',
 ];
 
+// eslint-disable-next-line @n8n/community-nodes/node-usable-as-tool -- Trigger node không được dùng làm AI tool (sẽ render sai thành sub-node tròn, mất cổng Main)
 export class ZaloOaTrigger implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'Zalo OA Trigger',
@@ -133,7 +134,6 @@ export class ZaloOaTrigger implements INodeType {
 					'Whether to return a simplified payload (event_name, sender_id, recipient_id, message, timestamp) cùng raw body. Tắt để chỉ trả body nguyên gốc.',
 			},
 		],
-		usableAsTool: true,
 	};
 
 	async webhook(this: IWebhookFunctions): Promise<IWebhookResponseData> {

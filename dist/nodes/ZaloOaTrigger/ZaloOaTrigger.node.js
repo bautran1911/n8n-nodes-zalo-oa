@@ -104,7 +104,6 @@ class ZaloOaTrigger {
                     description: 'Whether to return a simplified payload (event_name, sender_id, recipient_id, message, timestamp) cùng raw body. Tắt để chỉ trả body nguyên gốc.',
                 },
             ],
-            usableAsTool: true,
         };
     }
     async webhook() {
