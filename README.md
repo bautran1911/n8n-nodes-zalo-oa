@@ -367,6 +367,8 @@ Tạo workflow với:
 
 - [Tài liệu Zalo ZBS API](https://developers.zalo.me/docs/zbs-template-message/)
 - [Zalo OA API Reference](https://developers.zalo.me/docs/official-account/)
+- [Zalo OA Webhook — Sự kiện người dùng gửi tin nhắn](https://developers.zalo.me/docs/official-account/webhook/tin-nhan/su-kien-nguoi-dung-gui-tin-nhan)
+- [Zalo OA — Gửi tin tư vấn dạng văn bản](https://developers.zalo.me/docs/official-account/tin-nhan/tin-tu-van/gui-tin-tu-van-dang-van-ban)
 - [n8n Community Nodes Docs](https://docs.n8n.io/integrations/community-nodes/)
 - [GitHub Repository](https://github.com/bautran1911/n8n-nodes-zalo-oa)
 
@@ -407,6 +409,13 @@ Nếu node này giúp ích cho công việc của bạn, hãy ủng hộ tác gi
 ---
 
 ## Version History
+
+### v1.0.14 (2026-04)
+
+- ⚡ **NEW:** Thêm node **Zalo OA Trigger** — webhook trigger nhận event realtime từ Zalo OA (user_send_text/image/link/audio/video/sticker/location/file/gif, follow, unfollow, user_submit_info, user_seen_message...).
+- 🤖 **NEW:** Thêm resource **Tin Tư Vấn (CS Message)** với operation **Gửi Tin Tư Vấn Dạng Văn Bản** (`POST /v3.0/oa/message/cs`) — phục vụ workflow chatbot AI phản hồi tin nhắn khách hàng.
+- 🔐 Hỗ trợ xác thực chữ ký webhook `X-ZEvent-Signature` trên trigger.
+- 🧩 Output rút gọn của trigger trả sẵn `user_id`, `text`, `msg_id`, `attachments` ở top-level để AI Agent / LLM dùng trực tiếp.
 
 ### v1.0.13 (2026-04)
 
