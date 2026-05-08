@@ -124,23 +124,24 @@ class ZaloOaTrigger {
             catch {
                 creds = undefined;
             }
-            const secretKey = (creds === null || creds === void 0 ? void 0 : creds.secretKey) || '';
+            const appId = (creds === null || creds === void 0 ? void 0 : creds.appId) || '';
+            const oaSecretKey = (creds === null || creds === void 0 ? void 0 : creds.oaSecretKey) || (creds === null || creds === void 0 ? void 0 : creds.secretKey) || '';
             const signatureHeader = headers['x-zevent-signature'] ||
                 headers['X-ZEvent-Signature'] ||
                 '';
             const rawBody = (_c = req.rawBody) !== null && _c !== void 0 ? _c : JSON.stringify(body);
             const rawBodyStr = typeof rawBody === 'string' ? rawBody : rawBody.toString('utf8');
             const timestamp = String((_d = body.timestamp) !== null && _d !== void 0 ? _d : '');
-            if (!secretKey || !signatureHeader) {
+            if (!appId || !oaSecretKey || !signatureHeader) {
                 return {
                     webhookResponse: { status: 'invalid_signature' },
                     noWebhookResponse: false,
                 };
             }
             const expectedSha256 = (0, crypto_1.createHash)('sha256')
-                .update(rawBodyStr + timestamp + secretKey)
+                .update(appId + rawBodyStr + timestamp + oaSecretKey)
                 .digest('hex');
-            const expectedHmac = (0, crypto_1.createHmac)('sha256', secretKey)
+            const expectedHmac = (0, crypto_1.createHmac)('sha256', oaSecretKey)
                 .update(rawBodyStr)
                 .digest('hex');
             const providedSig = signatureHeader.replace(/^mac=/i, '').trim().toLowerCase();

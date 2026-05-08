@@ -156,7 +156,8 @@ export class ZaloOaTrigger implements INodeType {
 			} catch {
 				creds = undefined;
 			}
-			const secretKey = (creds?.secretKey as string) || '';
+			const appId = (creds?.appId as string) || '';
+			const oaSecretKey = (creds?.oaSecretKey as string) || (creds?.secretKey as string) || '';
 
 			const signatureHeader =
 				(headers['x-zevent-signature'] as string) ||
@@ -169,20 +170,20 @@ export class ZaloOaTrigger implements INodeType {
 			const rawBodyStr = typeof rawBody === 'string' ? rawBody : rawBody.toString('utf8');
 			const timestamp = String(body.timestamp ?? '');
 
-			if (!secretKey || !signatureHeader) {
+			if (!appId || !oaSecretKey || !signatureHeader) {
 				return {
 					webhookResponse: { status: 'invalid_signature' },
 					noWebhookResponse: false,
 				};
 			}
 
-			// Zalo: mac = SHA256(data + timestamp + oa_secret_key)
+			// Zalo: mac = SHA256(appId + data + timeStamp + OAsecretKey)
 			const expectedSha256 = createHash('sha256')
-				.update(rawBodyStr + timestamp + secretKey)
+				.update(appId + rawBodyStr + timestamp + oaSecretKey)
 				.digest('hex');
 
 			// Một số webhook cũ còn dùng HMAC-SHA256(body, secret)
-			const expectedHmac = createHmac('sha256', secretKey)
+			const expectedHmac = createHmac('sha256', oaSecretKey)
 				.update(rawBodyStr)
 				.digest('hex');
 

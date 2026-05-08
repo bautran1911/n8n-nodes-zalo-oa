@@ -34,6 +34,15 @@ class ZaloOaApi {
                 description: 'Zalo App Secret Key lấy tại developers.zalo.me',
             },
             {
+                displayName: 'OA Secret Key (Webhook Signature)',
+                name: 'oaSecretKey',
+                type: 'string',
+                typeOptions: { password: true },
+                required: false,
+                default: '',
+                description: 'Secret key dùng để verify webhook signature của OA (có thể khác Secret Key của App). Nếu bỏ trống sẽ fallback về Secret Key.',
+            },
+            {
                 displayName: 'Access Token',
                 name: 'accessToken',
                 type: 'string',
