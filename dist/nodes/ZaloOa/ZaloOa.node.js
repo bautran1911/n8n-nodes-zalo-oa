@@ -27,7 +27,7 @@ async function refreshAccessToken(ctx, creds) {
     return response;
 }
 async function writeTokensToCredential(ctx, creds, newAccessToken, newRefreshToken) {
-    var _a;
+    var _a, _b;
     const { n8nInstanceUrl, n8nApiKey, credentialId } = creds;
     if (!n8nInstanceUrl || !n8nApiKey || !credentialId) {
         return;
@@ -38,12 +38,13 @@ async function writeTokensToCredential(ctx, creds, newAccessToken, newRefreshTok
             credentialName: creds.credentialName,
             appId: creds.appId,
             secretKey: creds.secretKey,
+            oaSecretKey: (_a = creds.oaSecretKey) !== null && _a !== void 0 ? _a : '',
             accessToken: newAccessToken,
             refreshToken: newRefreshToken,
             n8nInstanceUrl: n8nInstanceUrl !== null && n8nInstanceUrl !== void 0 ? n8nInstanceUrl : '',
             n8nApiKey: n8nApiKey !== null && n8nApiKey !== void 0 ? n8nApiKey : '',
             credentialId: credentialId !== null && credentialId !== void 0 ? credentialId : '',
-            allowedHttpRequestDomains: (_a = creds.allowedHttpRequestDomains) !== null && _a !== void 0 ? _a : 'all',
+            allowedHttpRequestDomains: (_b = creds.allowedHttpRequestDomains) !== null && _b !== void 0 ? _b : 'all',
         };
         if (creds.allowedHttpRequestDomains === 'domains' && creds.allowedDomains) {
             dataPayload.allowedDomains = creds.allowedDomains;
@@ -436,6 +437,7 @@ class ZaloOa {
             credentialName: rawCreds.credentialName,
             appId: rawCreds.appId,
             secretKey: rawCreds.secretKey,
+            oaSecretKey: rawCreds.oaSecretKey || '',
             accessToken: rawCreds.accessToken,
             refreshToken: rawCreds.refreshToken,
             n8nInstanceUrl: rawCreds.n8nInstanceUrl || '',

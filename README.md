@@ -80,6 +80,8 @@ Sau khi cài node, tạo credential **Zalo OA API** với các thông tin sau:
 | **n8n API Key** | Tạo tại n8n → **Settings → API → Create an API key** |
 | **Credential ID** | Sau khi lưu credential, xem ID trên URL trình duyệt: `.../credentials/<ID>` |
 
+Khi bạn bật **tự động cập nhật token** (điền đủ **n8n Instance URL**, **n8n API Key**, **Credential ID**), node gọi `PATCH /api/v1/credentials/:id` để ghi **Access Token** và **Refresh Token** mới. Payload gửi kèm luôn **OA Secret Key (Webhook Signature)** (giá trị hiện có trong credential) để trường này **không bị xóa trống** sau mỗi lần refresh — kể cả refresh thủ công (Resource **Token**) hay tự động khi gọi API và retry sau lỗi hết hạn token.
+
 ---
 
 ## Lấy Access Token và Refresh Token từ Zalo
@@ -305,7 +307,9 @@ Mẹo:
 
 ### Resource: Token
 
-**Refresh Token** — Làm mới Access Token từ Refresh Token và tự động ghi đè vào credential.
+**Refresh Token** — Làm mới Access Token từ Refresh Token và tự động ghi đè vào credential (khi đã cấu hình n8n API + Credential ID).
+
+- Token mới được cập nhật qua REST API của n8n; các trường credential khác được gửi lại đồng bộ, gồm **OA Secret Key (Webhook Signature)** nếu bạn đã lưu — tránh mất secret dùng cho **Verify Signature** trên **Zalo OA Trigger**.
 
 Sử dụng khi muốn chủ động làm mới token (ví dụ: chạy định kỳ mỗi 5 ngày).
 
@@ -410,6 +414,10 @@ Nếu node này giúp ích cho công việc của bạn, hãy ủng hộ tác gi
 ---
 
 ## Version History
+
+### v1.0.16 (2026-05)
+
+- 🔐 **FIX:** Khi ghi token mới vào credential qua n8n REST API (refresh thủ công hoặc auto-retry), payload gồm **OA Secret Key** để trường này không bị xóa trống.
 
 ### v1.0.15 (2026-05)
 

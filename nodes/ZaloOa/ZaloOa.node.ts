@@ -20,6 +20,7 @@ interface ZaloCredentials {
 	credentialName: string;
 	appId: string;
 	secretKey: string;
+	oaSecretKey?: string;
 	accessToken: string;
 	refreshToken: string;
 	n8nInstanceUrl?: string;
@@ -97,6 +98,7 @@ async function writeTokensToCredential(
 			credentialName: creds.credentialName,
 			appId: creds.appId,
 			secretKey: creds.secretKey,
+			oaSecretKey: creds.oaSecretKey ?? '',
 			accessToken: newAccessToken,
 			refreshToken: newRefreshToken,
 			n8nInstanceUrl: n8nInstanceUrl ?? '',
@@ -564,6 +566,7 @@ export class ZaloOa implements INodeType {
 			credentialName: rawCreds.credentialName as string,
 			appId: rawCreds.appId as string,
 			secretKey: rawCreds.secretKey as string,
+			oaSecretKey: (rawCreds.oaSecretKey as string) || '',
 			accessToken: rawCreds.accessToken as string,
 			refreshToken: rawCreds.refreshToken as string,
 			n8nInstanceUrl: (rawCreds.n8nInstanceUrl as string) || '',
